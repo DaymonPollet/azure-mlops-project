@@ -97,7 +97,7 @@ jobs:
             VERSION=$(az ml model list -n animal-classification --query "[0].version" -o tsv)
             # Download the model. Assuming it should be downloaded to the current working directory.
             # If your model is in an asset (e.g. zip) you may need to specify the --output-path
-            az ml model download --name animal-classification --version $VERSION --path .
+          az ml model download --name animal-classification --version $VERSION
 
       # New!! Uploads the content of the 'inference' directory as an artifact
       - name: Docker -- Upload API code from Inference
