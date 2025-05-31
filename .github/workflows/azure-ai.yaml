@@ -29,10 +29,10 @@ jobs:
       #    Installs Azure ML CLI extension and lists computes to verify connection
       #    This step is directly from your assignment instructions.
       - name: Azure test - Get Compute
-        uses: azure/CLI@v2.1.0 # Use a specific version of Azure CLI action
+        uses: azure/CLI@v2.1.0
         with:
-          azcliversion: 2.64.0 # Specify the Azure CLI version
+          azcliversion: latest # CHANGED THIS LINE
           inlineScript: |
-            az extension add --name ml # Add Azure ML extension
-            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION # Set defaults
-            az ml compute list # List computes to verify connection
+            az extension add --name ml
+            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
+            az ml compute list
