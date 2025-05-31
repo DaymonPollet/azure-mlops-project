@@ -1,0 +1,25 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+
+name: data_prep_image_resize_cli
+## Semver ?
+# Not production ready yet...
+version: 0.1.0
+display_name: Data preparation, Image Resizing
+is_deterministic: True
+type: command
+description: Reads a data asset of images and preprocesses them by resizing them to 64 to 64.
+
+environment: azureml:aml-Pillow-cli:0.1.0
+resources:
+  instance_count: 1
+
+code: ./code
+command: 'python dataprep.py --data ${{inputs.data}} --output_data ${{outputs.output_data}}'
+
+inputs:
+  data:
+    type: uri_folder
+    optional: False
+outputs:
+  output_data:
+    type: uri_folder

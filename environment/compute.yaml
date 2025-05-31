@@ -1,0 +1,31 @@
+$schema: https://azuremlschemas.azureedge.net/latest/computeInstance.schema.json
+name: cli-created-machine
+type: computeinstance
+size: STANDARD_DS3_V2
+
+schedules:
+  compute_start_stop:
+    - action: stop
+      state: enabled
+      trigger:
+        expression: 00 20 * * 1,2,3,4,5
+        time_zone: UTC
+        start_time: "2024-05-14T11:00:00"
+        type: cron
+    - action: start # Starts at 8:30 AM CEST (6:30 AM UTC) Mon-Thu
+      state: enabled
+      trigger:
+        expression: "30 6 * * 1,2,3,4"
+        start_time: "2025-06-01T00:00:00"
+        time_zone: "UTC"
+        type: cron
+    - action: start # Starts at 10:00 AM CEST (8:00 AM UTC) on Friday
+      state: enabled
+      trigger:
+        expression: "0 8 * * 5"
+        start_time: "2025-06-01T00:00:00"
+        time_zone: "UTC"
+        type: cron
+idle_time_before_shutdown: PT30M
+idle_time_before_shutdown_minutes: 30
+
