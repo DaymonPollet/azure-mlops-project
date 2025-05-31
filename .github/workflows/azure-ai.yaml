@@ -1,0 +1,38 @@
+name: Azure ML Job Pipeline # Display name for your workflow in GitHub Actions
+on:
+  workflow_dispatch: # Allows you to manually trigger the workflow from GitHub UI
+  # Uncomment the following block later if you want the workflow to run on every push to 'main'
+  # push:
+  #   branches:
+  #     - main
+
+env:
+  GROUP: mlops-demo # 
+  WORKSPACE: pollet-daymon-ml 
+  LOCATION: westeurope 
+
+jobs:
+  azure-pipeline:
+    runs-on: ubuntu-24.04 
+    steps:
+      # 1. Check out code repository: Clones your GitHub repository into the runner
+      - name: Check out code repository
+        uses: actions/checkout@v4
+
+      # 2. Azure login: Logs into Azure using the Service Principal credentials stored in GitHub Secrets
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 3. Azure test - Get Compute: (Demonstration step)
+      #    Installs Azure ML CLI extension and lists computes to verify connection
+      #    This step is directly from your assignment instructions.
+      - name: Azure test - Get Compute
+        uses: azure/CLI@v2.1.0 # Use a specific version of Azure CLI action
+        with:
+          azcliversion: 2.64.0 # Specify the Azure CLI version
+          inlineScript: |
+            az extension add --name ml # Add Azure ML extension
+            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION # Set defaults
+            az ml compute list # List computes to verify connection
