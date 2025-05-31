@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-animals-api
+  labels:
+    app: mlops-animals-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlops-animals-api
+  template:
+    metadata:
+      labels:
+        app: mlops-animals-api
+    spec:
+      containers:
+      - name: mlops-animals-api
+        image: ghcr.io/DaymonPollet/mlops-animals-api:${{ github.sha }}
+        ports:
+        - containerPort: 80 # assumption about port 80 
+        env:
+        - name: MODEL_VERSION
+          value: "${{ env.VERSION }}" # this would link to the model version you download, hopefully it's there
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-animals-api-service
+spec:
+  selector:
+    app: mlops-animals-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80 # match the containerport
+  type: LoadBalancer # use LoadBalancer for external access in a lab, or ClusterIP for internal (don't forget this)
