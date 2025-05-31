@@ -36,3 +36,39 @@ jobs:
             az extension add --name ml
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             az ml compute list
+            
+      # 4. Azure -- Component Setup (from assignment)
+      # Reusing 'latest' for azcliversion
+      - name: Azure -- Component Setup
+        uses: Azure/CLI@v2.1.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az extension add --name ml
+            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
+            az ml component create --file ./components/dataprep/dataprep.yaml # Corrected from components to component, if you get an error revert to components
+            az ml component create --file ./components/dataprep/data_split.yaml # Corrected from components to component
+            az ml component create --file ./components/training/training.yaml # Corrected from components to component
+
+      # 5. Pipeline in Azure - Start the training job (from assignment)
+      # Reusing 'latest' for azcliversion
+      - name: Azure -- Start Training Job
+        uses: Azure/CLI@v2.1.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az extension add --name ml
+            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
+            az ml job create --file ./pipeline.yaml --stream --set name=animals-classification-${{ github.sha }}-${{ github.run_id }}
+
+      # 6. Stop the compute machine (from assignment)
+      # Reusing 'latest' for azcliversion and adding continue-on-error
+      - name: Azure -- Stop Compute
+        uses: Azure/CLI@v2.1.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az extension add --name ml -y # Added -y for non-interactive
+            az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
+            az ml compute stop --name cli-created-machine
+        continue-on-error: true # Ignore errors if compute is already stopped
