@@ -7,7 +7,7 @@ on:
   #     - main
 
 env:
-  GROUP: mlops-demo # 
+  GROUP: mlops-demo 
   WORKSPACE: pollet-daymon-ml 
   LOCATION: westeurope 
 
@@ -63,15 +63,38 @@ jobs:
 
       # 6. Stop the compute machine (from assignment)
       # Reusing 'latest' for azcliversion and adding continue-on-error
-      - name: Azure -- Stop Compute
-        uses: Azure/CLI@v2.1.0
+      - name: Azure -- Start Compute
+        uses: azure/CLI@v2.1.0
         with:
-          azcliversion: latest
+          azcliversion: 2.64.0
           inlineScript: |
-            az extension add --name ml -y # Added -y for non-interactive
+            az extension add --name ml -y
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
-            az ml compute stop --name cli-created-machine
-        continue-on-error: true # Ignore errors if compute is already stopped
+
+            COMPUTE_NAME="cli-created-machine"
+
+            set +e
+            COMPUTE_STATUS=$(az ml compute show --name $COMPUTE_NAME --query properties.status -o tsv 2>/dev/null)
+            EXIT_CODE=$?
+            set -e
+
+            echo "Compute '$COMPUTE_NAME' status: $COMPUTE_STATUS"
+
+            if [ "$EXIT_CODE" -ne 0 ]; then
+              echo "Error: Couldn't get status for compute '$COMPUTE_NAME'. It might not exist or there's a permission issue."
+              exit 1
+            elif [ "$COMPUTE_STATUS" == "Stopped" ]; then
+              echo "Compute '$COMPUTE_NAME' is stopped. Starting it now..."
+              az ml compute start --name $COMPUTE_NAME
+              echo "Compute '$COMPUTE_NAME' start command issued. Monitor its status in Azure portal."
+            elif [ "$COMPUTE_STATUS" == "Running" ]; then
+              echo "Compute '$COMPUTE_NAME' is already running. No action needed."
+            elif [ "$COMPUTE_STATUS" == "Starting" ]; then
+              echo "Compute '$COMPUTE_NAME' is already in a 'Starting' state."
+            else
+              echo "Compute '$COMPUTE_NAME' is in an unexpected state: $COMPUTE_STATUS. Aborting."
+              exit 1
+            fi
 
   download:
       needs: azure-pipeline # New!! This job will only run after 'azure-pipeline' succeeds
