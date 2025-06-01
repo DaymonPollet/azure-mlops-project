@@ -167,8 +167,12 @@ jobs:
         with:
           azcliversion: latest
           inlineScript: |
-            # Replace 'mlops-aks-cluster' with the actual name of your AKS cluster if different
+            set -e # This will make the step fail immediately if any command within it fails
+            echo "Attempting to get AKS credentials for mlops-aks-cluster..."
             az aks get-credentials --resource-group ${{ env.GROUP }} --name mlops-aks-cluster --overwrite-existing --admin
+            echo "--- kubectl get nodes output (to verify context) ---"
+            kubectl get nodes # This command will confirm if kubectl is connected to the cluster
+            echo "----------------------------------------------------"
 
       - name: Deploy to Kubernetes
         run: |
