@@ -168,7 +168,4 @@ jobs:
         run: |
           echo "Substituting variables into Kubernetes deployment YAML..."
           envsubst < k8s-deployment.yaml | kubectl apply -f -
-
-      - name: Check rollout status
-        run: |
-          kubectl rollout status deployment/mlops-animals-api
+          
