@@ -16,12 +16,12 @@ spec:
     spec:
       containers:
       - name: mlops-animals-api
-        image: ghcr.io/DaymonPollet/mlops-animals-api:${GITHUB_SHA} # ✅ updated to use envsubst-compatible variable
+        image: ghcr.io/daymonpollet/mlops-animals-api:${GITHUB_SHA}
         ports:
-        - containerPort: 8000 # ✅ updated to match Dockerfile
+        - containerPort: 8000
         env:
         - name: MODEL_VERSION
-          value: "${MODEL_VERSION_FOR_K8S}" # ✅ envsubst-compatible format
+          value: "${MODEL_VERSION_FOR_K8S}"
 ---
 apiVersion: v1
 kind: Service
@@ -33,5 +33,5 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8000 
+      targetPort: 8000
   type: LoadBalancer
