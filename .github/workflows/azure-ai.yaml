@@ -107,7 +107,8 @@ jobs:
         id: docker-meta-data
         uses: docker/metadata-action@v5.5.1
         with:
-          images: ghcr.io/daymonpollet/mlops-animals-api
+          images: |
+            ghcr.io/daymonpollet/mlops-animals-api
           tags: |
             type=ref,event=branch
             type=sha
@@ -136,24 +137,23 @@ jobs:
       - name: Install kubectl
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl apt-transport-https gnupg
+          sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
           sudo mkdir -p /etc/apt/keyrings
-          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/kubernetes-apt-keyring.gpg > /dev/null
+          sudo chmod 755 /etc/apt/keyrings
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo bash -c 'gpg --dearmor > /etc/apt/keyrings/kubernetes-apt-keyring.gpg'
           echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
           sudo apt-get update
           sudo apt-get install -y kubectl
 
       - name: Login to Azure and set AKS context
         run: |
-          echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_creds.json
-          client_id=$(jq -r .clientId azure_creds.json)
-          client_secret=$(jq -r .clientSecret azure_creds.json)
-          tenant_id=$(jq -r .tenantId azure_creds.json)
-          subscription_id=$(jq -r .subscriptionId azure_creds.json)
-
-          az login --service-principal -u "$client_id" -p "$client_secret" --tenant "$tenant_id"
-          az account set --subscription "$subscription_id"
+          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+          az login --service-principal --username "$(jq -r .clientId azure_creds.json)" \
+                  --password "$(jq -r .clientSecret azure_creds.json)" \
+                  --tenant "$(jq -r .tenantId azure_creds.json)"
           az aks get-credentials --resource-group $GROUP --name mlops-aks-cluster --overwrite-existing --admin
+
+      # 👇 don't forget this -> runs kubectl on the host runner, not inside Azure CLI container (cuz kubectl isn't pre-installed there) 
 
       - name: Verify Kubernetes connection
         run: |
@@ -168,24 +168,3 @@ jobs:
         run: |
           echo "Substituting variables into Kubernetes deployment YAML..."
           envsubst < k8s-deployment.yaml | kubectl apply -f -
-
-      - name: Check rollout status
-        run: |
-          kubectl rollout status deployment/mlops-animals-api
-
-      - name: Debug failed rollout
-        if: failure()
-        run: |
-          echo "🔍 Describing the deployment:"
-          kubectl describe deployment mlops-animals-api
-
-          echo "🔍 Getting pods:"
-          kubectl get pods -l app=mlops-animals-api
-
-          echo "🔍 Describing pods:"
-          kubectl describe pods -l app=mlops-animals-api
-
-          echo "🔍 Printing logs from first pod:"
-          POD=$(kubectl get pods -l app=mlops-animals-api -o jsonpath="{.items[0].metadata.name}")
-          kubectl logs $POD
-
