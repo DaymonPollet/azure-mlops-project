@@ -142,7 +142,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5.3.0
         with:
-          context: ./inference # Corrected context to where artifact is downloaded
+          context: . # CORRECTED: Dockerfile is in the repository root
           push: true
           tags: ${{ steps.docker-meta-data.outputs.tags }}
 

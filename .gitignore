@@ -1,3 +1,11 @@
 .ipynb_aml_checkpoints
 01_datapreparing.ipynb.amltmp
 components.zip
+.git
+__pycache__
+*.pyc
+.env
+.pytest_cache
+temp/
+data/
+# Add any other files or directories that are not needed in the final image
