@@ -168,4 +168,24 @@ jobs:
         run: |
           echo "Substituting variables into Kubernetes deployment YAML..."
           envsubst < k8s-deployment.yaml | kubectl apply -f -
-          
+
+      - name: Check rollout status
+        run: |
+          kubectl rollout status deployment/mlops-animals-api
+
+      - name: Debug failed rollout
+        if: failure()
+        run: |
+          echo "🔍 Describing the deployment:"
+          kubectl describe deployment mlops-animals-api
+
+          echo "🔍 Getting pods:"
+          kubectl get pods -l app=mlops-animals-api
+
+          echo "🔍 Describing pods:"
+          kubectl describe pods -l app=mlops-animals-api
+
+          echo "🔍 Printing logs from first pod:"
+          POD=$(kubectl get pods -l app=mlops-animals-api -o jsonpath="{.items[0].metadata.name}")
+          kubectl logs $POD
+
