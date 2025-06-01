@@ -74,9 +74,11 @@ jobs:
         continue-on-error: true # Ignore errors if compute is already stopped
 
   download:
-      needs: azure-pipeline # New!! This job will only run after 'azure-pipeline' succeeds
-      runs-on: ubuntu-24.04
-      steps:
+    needs: azure-pipeline
+    runs-on: ubuntu-24.04
+    outputs:
+      model_version: ${{ steps.download_model_version.outputs.MODEL_VERSION }} 
+    steps:
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -87,16 +89,15 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Azure -- Download Model
+        id: download_model_version 
         uses: azure/CLI@v2.1.0
         with:
-          azcliversion: latest # Use 'latest' as it works for you
+          azcliversion: latest
           inlineScript: |
             az extension add --name ml -y
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
-            # Get the latest version of the 'animal-classification' model
             VERSION=$(az ml model list -n animal-classification --query "[0].version" -o tsv)
-            # Download the model. Assuming it should be downloaded to the current working directory.
-            # If your model is in an asset (e.g. zip) you may need to specify the --output-path
+            echo "MODEL_VERSION=$VERSION" >> $GITHUB_OUTPUT # <--- NEW: Set the variable as a step output
             az ml model download --name animal-classification --version $VERSION
 
       # New!! Uploads the content of the 'inference' directory as an artifact
@@ -107,11 +108,13 @@ jobs:
           path: inference
 
   deploy:
-    needs: download
-    runs-on: ubuntu-24.04 # Or self-hosted if you have it configured
+    needs: download # Ensure 'deploy' job depends on 'download'
+    runs-on: ubuntu-24.04
     permissions:
-      packages: write # <--- ADD THIS LINE to grant write access to packages
-      contents: read  # <--- It's good practice to explicitly define this too
+      packages: write
+      contents: read
+    env: # <--- NEW: Define environment variables for the 'deploy' job
+      MODEL_VERSION_FOR_K8S: ${{ needs.download.outputs.model_version }} # <--- NEW: Get the output from 'download' job
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -147,9 +150,20 @@ jobs:
           push: true
           tags: ${{ steps.docker-meta-data.outputs.tags }}
 
+      # NEW STEP: Install kubectl on the runner
+      - name: Install kubectl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-transport-https ca-certificates curl
+          # Download the Kubernetes public key
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          # Add the Kubernetes apt repository
+          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+          # Update apt-get and install kubectl
+          sudo apt-get update
+          sudo apt-get install -y kubectl
+
+      # UPDATED STEP: Deploy to Kubernetes (now running directly on the runner)
       - name: Deploy to Kubernetes
-        uses: azure/CLI@v2.1.0
-        with:
-          azcliversion: latest
-          inlineScript: |
-            kubectl apply -f k3d-deployment.yaml
+        run: |
+          kubectl apply -f k3d-deployment.yaml

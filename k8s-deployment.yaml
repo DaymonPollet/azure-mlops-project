@@ -21,7 +21,7 @@ spec:
         - containerPort: 80 # assumption about port 80 
         env:
         - name: MODEL_VERSION
-          value: "${{ env.VERSION }}" # this would link to the model version you download, hopefully it's there
+          value: "${{ env.MODEL_VERSION_FOR_K8S }}" # this would link to the model version you download, hopefully it's there
 ---
 apiVersion: v1
 kind: Service
