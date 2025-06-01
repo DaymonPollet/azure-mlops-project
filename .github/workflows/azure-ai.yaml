@@ -1,10 +1,7 @@
-name: Azure ML Job Pipeline # Display name for your workflow in GitHub Actions
+name: Azure ML Job Pipeline
+
 on:
-  workflow_dispatch: # Allows you to manually trigger the workflow from GitHub UI
-  # Uncomment the following block later if you want the workflow to run on every push to 'main'
-  # push:
-  #   branches:
-  #     - main
+  workflow_dispatch:
 
 env:
   GROUP: mlops-demo
@@ -15,19 +12,14 @@ jobs:
   azure-pipeline:
     runs-on: ubuntu-24.04
     steps:
-      # 1. Check out code repository: Clones your GitHub repository into the runner
       - name: Check out code repository
         uses: actions/checkout@v4
 
-      # 2. Azure login: Logs into Azure using the Service Principal credentials stored in GitHub Secrets
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3. Azure test - Get Compute: (Demonstration step)
-      #    Installs Azure ML CLI extension and lists computes to verify connection
-      #    This step is directly from your assignment instructions.
       - name: Azure test - Get Compute
         uses: azure/CLI@v2.1.0
         with:
@@ -36,8 +28,7 @@ jobs:
             az extension add --name ml
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             az ml compute list
-            
-      # 4. Azure -- Component Setup (from assignment)
+
       - name: Azure -- Component Setup
         uses: Azure/CLI@v2.1.0
         with:
@@ -49,7 +40,6 @@ jobs:
             az ml component create --file ./components/dataprep/data_split.yaml
             az ml component create --file ./components/training/training.yaml
 
-      # 5. Pipeline in Azure - Start the training job (from assignment)
       - name: Azure -- Start Training Job
         uses: Azure/CLI@v2.1.0
         with:
@@ -59,7 +49,6 @@ jobs:
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             az ml job create --file ./pipeline.yaml --stream --set name=animals-classification-${{ github.sha }}-${{ github.run_id }}
 
-      # 6. Stop the compute machine (from assignment)
       - name: Azure -- Stop Compute
         uses: Azure/CLI@v2.1.0
         with:
@@ -76,7 +65,6 @@ jobs:
     outputs:
       model_version: ${{ steps.download_model_version.outputs.MODEL_VERSION }}
     steps:
-
       - name: Check out repository
         uses: actions/checkout@v4
 
@@ -142,7 +130,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5.3.0
         with:
-          context: . # CORRECTED: Dockerfile is in the repository root
+          context: .
           push: true
           tags: ${{ steps.docker-meta-data.outputs.tags }}
 
@@ -162,17 +150,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set Kubernetes Context (for AKS)
+      - name: Get AKS credentials
         uses: azure/CLI@v2.1.0
         with:
           azcliversion: latest
           inlineScript: |
-            set -e # This will make the step fail immediately if any command within it fails
-            echo "Attempting to get AKS credentials for mlops-aks-cluster..."
-            az aks get-credentials --resource-group ${{ env.GROUP }} --name mlops-aks-cluster --overwrite-existing --admin
-            echo "--- kubectl get nodes output (to verify context) ---"
-            kubectl get nodes # This command will confirm if kubectl is connected to the cluster
-            echo "----------------------------------------------------"
+            echo "Getting AKS credentials..."
+            az aks get-credentials --resource-group $GROUP --name mlops-aks-cluster --overwrite-existing --admin
+      # 👇 don't forget this -> runs kubectl on the host runner, not inside Azure CLI container (cuz kubectl isn't pre-installed there) 
+
+      - name: Verify Kubernetes connection
+        run: |
+          echo "--- kubectl get nodes output ---"
+          kubectl get nodes
+          echo "--------------------------------"
 
       - name: Deploy to Kubernetes with substituted variables
         env:
