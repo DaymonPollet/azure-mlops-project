@@ -150,20 +150,29 @@ jobs:
           push: true
           tags: ${{ steps.docker-meta-data.outputs.tags }}
 
-      # NEW STEP: Install kubectl on the runner
       - name: Install kubectl
         run: |
+          # Update apt and install necessary packages including gnupg
           sudo apt-get update
-          sudo apt-get install -y apt-transport-https ca-certificates curl
-          # Download the Kubernetes public key
-          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-          # Add the Kubernetes apt repository
-          echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-          # Update apt-get and install kubectl
+          sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+
+          # Create the directory for apt keyrings if it doesn't exist and set correct permissions
+          sudo mkdir -p /etc/apt/keyrings
+          sudo chmod 755 /etc/apt/keyrings # Ensure the directory is accessible
+
+          # Download the Kubernetes public key and dearmor it directly to the keyring file.
+          # Using 'sudo bash -c' ensures the command runs in a non-interactive shell context.
+          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo bash -c 'gpg --dearmor > /etc/apt/keyrings/kubernetes-apt-keyring.gpg'
+
+          # Add the Kubernetes apt repository to your sources list
+          echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+          # Update apt package index with the new repository
           sudo apt-get update
+
+          # Install kubectl
           sudo apt-get install -y kubectl
 
-      # UPDATED STEP: Deploy to Kubernetes (now running directly on the runner)
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k3d-deployment.yaml
