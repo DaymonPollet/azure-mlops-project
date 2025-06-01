@@ -174,6 +174,10 @@ jobs:
             kubectl get nodes # This command will confirm if kubectl is connected to the cluster
             echo "----------------------------------------------------"
 
-      - name: Deploy to Kubernetes
+      - name: Deploy to Kubernetes with substituted variables
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          MODEL_VERSION_FOR_K8S: ${{ env.MODEL_VERSION_FOR_K8S }}
         run: |
-          kubectl apply -f k8s-deployment.yaml
+          echo "Substituting variables into Kubernetes deployment YAML..."
+          envsubst < k8s-deployment.yaml | kubectl apply -f -

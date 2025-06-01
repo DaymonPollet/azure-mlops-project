@@ -16,12 +16,12 @@ spec:
     spec:
       containers:
       - name: mlops-animals-api
-        image: ghcr.io/DaymonPollet/mlops-animals-api:${{ github.sha }} # Image will be tagged with the Git SHA
+        image: ghcr.io/DaymonPollet/mlops-animals-api:${GITHUB_SHA} # ✅ updated to use envsubst-compatible variable
         ports:
-        - containerPort: 80 # Assuming your API listens on port 80 inside the container
+        - containerPort: 8000 # ✅ updated to match Dockerfile
         env:
         - name: MODEL_VERSION
-          value: "${{ env.MODEL_VERSION_FOR_K8S }}" # Links to the model version downloaded and passed from the workflow
+          value: "${MODEL_VERSION_FOR_K8S}" # ✅ envsubst-compatible format
 ---
 apiVersion: v1
 kind: Service
@@ -33,5 +33,5 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 80 # Matches the containerPort
-  type: LoadBalancer # Exposes the service externally (will get an external IP in cloud K8s)
+      targetPort: 8000 
+  type: LoadBalancer
