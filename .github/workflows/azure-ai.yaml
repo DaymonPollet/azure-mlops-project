@@ -7,13 +7,13 @@ on:
   #     - main
 
 env:
-  GROUP: mlops-demo 
-  WORKSPACE: pollet-daymon-ml 
-  LOCATION: westeurope 
+  GROUP: mlops-demo
+  WORKSPACE: pollet-daymon-ml
+  LOCATION: westeurope
 
 jobs:
   azure-pipeline:
-    runs-on: ubuntu-24.04 
+    runs-on: ubuntu-24.04
     steps:
       # 1. Check out code repository: Clones your GitHub repository into the runner
       - name: Check out code repository
@@ -31,14 +31,13 @@ jobs:
       - name: Azure test - Get Compute
         uses: azure/CLI@v2.1.0
         with:
-          azcliversion: latest # CHANGED THIS LINE
+          azcliversion: latest
           inlineScript: |
             az extension add --name ml
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             az ml compute list
             
       # 4. Azure -- Component Setup (from assignment)
-      # Reusing 'latest' for azcliversion
       - name: Azure -- Component Setup
         uses: Azure/CLI@v2.1.0
         with:
@@ -46,12 +45,11 @@ jobs:
           inlineScript: |
             az extension add --name ml
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
-            az ml component create --file ./components/dataprep/dataprep.yaml # Corrected from components to component, if you get an error revert to components
-            az ml component create --file ./components/dataprep/data_split.yaml # Corrected from components to component
-            az ml component create --file ./components/training/training.yaml # Corrected from components to component
+            az ml component create --file ./components/dataprep/dataprep.yaml
+            az ml component create --file ./components/dataprep/data_split.yaml
+            az ml component create --file ./components/training/training.yaml
 
       # 5. Pipeline in Azure - Start the training job (from assignment)
-      # Reusing 'latest' for azcliversion
       - name: Azure -- Start Training Job
         uses: Azure/CLI@v2.1.0
         with:
@@ -62,22 +60,21 @@ jobs:
             az ml job create --file ./pipeline.yaml --stream --set name=animals-classification-${{ github.sha }}-${{ github.run_id }}
 
       # 6. Stop the compute machine (from assignment)
-      # Reusing 'latest' for azcliversion and adding continue-on-error
       - name: Azure -- Stop Compute
         uses: Azure/CLI@v2.1.0
         with:
           azcliversion: latest
           inlineScript: |
-            az extension add --name ml -y # Added -y for non-interactive
+            az extension add --name ml -y
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             az ml compute stop --name cli-created-machine
-        continue-on-error: true # Ignore errors if compute is already stopped
+        continue-on-error: true
 
   download:
     needs: azure-pipeline
     runs-on: ubuntu-24.04
     outputs:
-      model_version: ${{ steps.download_model_version.outputs.MODEL_VERSION }} 
+      model_version: ${{ steps.download_model_version.outputs.MODEL_VERSION }}
     steps:
 
       - name: Check out repository
@@ -89,7 +86,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Azure -- Download Model
-        id: download_model_version 
+        id: download_model_version
         uses: azure/CLI@v2.1.0
         with:
           azcliversion: latest
@@ -97,10 +94,9 @@ jobs:
             az extension add --name ml -y
             az configure --defaults group=$GROUP workspace=$WORKSPACE location=$LOCATION
             VERSION=$(az ml model list -n animal-classification --query "[0].version" -o tsv)
-            echo "MODEL_VERSION=$VERSION" >> $GITHUB_OUTPUT # <--- NEW: Set the variable as a step output
+            echo "MODEL_VERSION=$VERSION" >> $GITHUB_OUTPUT
             az ml model download --name animal-classification --version $VERSION
 
-      # New!! Uploads the content of the 'inference' directory as an artifact
       - name: Docker -- Upload API code from Inference
         uses: actions/upload-artifact@v4.3.3
         with:
@@ -108,13 +104,13 @@ jobs:
           path: inference
 
   deploy:
-    needs: download # Ensure 'deploy' job depends on 'download'
+    needs: download
     runs-on: ubuntu-24.04
     permissions:
       packages: write
       contents: read
-    env: # <--- NEW: Define environment variables for the 'deploy' job
-      MODEL_VERSION_FOR_K8S: ${{ needs.download.outputs.model_version }} # <--- NEW: Get the output from 'download' job
+    env:
+      MODEL_VERSION_FOR_K8S: ${{ needs.download.outputs.model_version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -124,7 +120,7 @@ jobs:
         uses: docker/metadata-action@v5.5.1
         with:
           images: |
-            ghcr.io/daymonpollet/mlops-animals-api # Ensure this is your GitHub username
+            ghcr.io/daymonpollet/mlops-animals-api
           tags: |
             type=ref,event=branch
             type=sha
@@ -146,32 +142,33 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v5.3.0
         with:
-          context: .
+          context: ./inference # Corrected context to where artifact is downloaded
           push: true
           tags: ${{ steps.docker-meta-data.outputs.tags }}
 
       - name: Install kubectl
         run: |
-          # Update apt and install necessary packages including gnupg
           sudo apt-get update
           sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-
-          # Create the directory for apt keyrings if it doesn't exist and set correct permissions
           sudo mkdir -p /etc/apt/keyrings
-          sudo chmod 755 /etc/apt/keyrings # Ensure the directory is accessible
-
-          # Download the Kubernetes public key and dearmor it directly to the keyring file.
-          # Using 'sudo bash -c' ensures the command runs in a non-interactive shell context.
+          sudo chmod 755 /etc/apt/keyrings
           curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo bash -c 'gpg --dearmor > /etc/apt/keyrings/kubernetes-apt-keyring.gpg'
-
-          # Add the Kubernetes apt repository to your sources list
           echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-          # Update apt package index with the new repository
           sudo apt-get update
-
-          # Install kubectl
           sudo apt-get install -y kubectl
+
+      - name: Azure Login for AKS
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set Kubernetes Context (for AKS)
+        uses: azure/CLI@v2.1.0
+        with:
+          azcliversion: latest
+          inlineScript: |
+            # Replace 'mlops-aks-cluster' with the actual name of your AKS cluster if different
+            az aks get-credentials --resource-group ${{ env.GROUP }} --name mlops-aks-cluster --overwrite-existing --admin
 
       - name: Deploy to Kubernetes
         run: |
