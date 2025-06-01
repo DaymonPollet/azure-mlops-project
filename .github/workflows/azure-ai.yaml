@@ -145,18 +145,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y kubectl
 
-      - name: Azure Login for AKS
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Login to Azure and set AKS context
+        run: |
+          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+          az login --service-principal --username "$(jq -r .clientId azure_creds.json)" \
+                  --password "$(jq -r .clientSecret azure_creds.json)" \
+                  --tenant "$(jq -r .tenantId azure_creds.json)"
+          az aks get-credentials --resource-group $GROUP --name mlops-aks-cluster --overwrite-existing --admin
 
-      - name: Get AKS credentials
-        uses: azure/CLI@v2.1.0
-        with:
-          azcliversion: latest
-          inlineScript: |
-            echo "Getting AKS credentials..."
-            az aks get-credentials --resource-group $GROUP --name mlops-aks-cluster --overwrite-existing --admin
       # 👇 don't forget this -> runs kubectl on the host runner, not inside Azure CLI container (cuz kubectl isn't pre-installed there) 
 
       - name: Verify Kubernetes connection
